@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}Task Master - Your Tasks{% endblock %}
+
+{% block content %}
+<div class="task-form">
+    <h2 class="mb-4">Add New Task</h2>
+    <form action="{{ url_for('index') }}" method="POST" class="task-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="content">Task</label>
+                <input type="text" class="form-control" id="content" name="content" placeholder="What needs to be done?" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="category">Category</label>
+                <input type="text" class="form-control" id="category" name="category" list="categories" placeholder="e.g., Work, Personal">
+                <datalist id="categories">
+                    {% for category in categories %}
+                        <option value="{{ category }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            
+            <div class="form-group">
+                <label for="due_date">Due Date</label>
+                <input type="date" class="form-control" id="due_date" name="due_date">
+            </div>
+            
+            <div class="form-group">
+                <label for="priority">Priority</label>
+                <select class="form-control" id="priority" name="priority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-plus mr-2"></i> Add Task
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="filters">
+    <div class="filter-group">
+        <label for="category-filter">Category</label>
+        <select class="form-control" id="category-filter" onchange="updateFilters()">
+            <option value="all" {% if current_category == 'all' %}selected{% endif %}>All Categories</option>
+            {% for category in categories %}
+                <option value="{{ category }}" {% if current_category == category %}selected{% endif %}>{{ category }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <label for="priority-filter">Priority</label>
+        <select class="form-control" id="priority-filter" onchange="updateFilters()">
+            <option value="all" {% if current_priority == 'all' %}selected{% endif %}>All Priorities</option>
+            <option value="high" {% if current_priority == 'high' %}selected{% endif %}>High</option>
+            <option value="medium" {% if current_priority == 'medium' %}selected{% endif %}>Medium</option>
+            <option value="low" {% if current_priority == 'low' %}selected{% endif %}>Low</option>
+        </select>
+    </div>
+</div>
+
+{% if tasks %}
+    <div class="task-list">
+        {% for task in tasks %}
+            <div class="task-item" id="task-{{ task.id }}">
+                <input type="checkbox" class="task-checkbox" 
+                       {% if task.completed %}checked{% endif %}
+                       data-task-id="{{ task.id }}">
+                
+                <div class="task-content">
+                    <h3 class="task-title {% if task.completed %}completed{% endif %}">
+                        {{ task.content }}
+                    </h3>
+                    <div class="task-meta">
+                        <span class="task-priority priority-{{ task.priority }}">
+                            {{ task.priority }}
+                        </span>
+                        {% if task.category %}
+                            <span class="task-category">
+                                {{ task.category }}
+                            </span>
+                        {% endif %}
+                        {% if task.due_date %}
+                            <span class="task-due">
+                                <i class="far fa-calendar-alt"></i>
+                                <span class="task-date">
+                                    {{ task.due_date.strftime('%b %d, %Y') }}
+                                </span>
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="task-actions">
+                    <a href="{{ url_for('update', id=task.id) }}" class="btn-icon edit" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <form action="{{ url_for('delete', id=task.id) }}" method="POST" class="delete-form" onsubmit="return confirm('Are you sure you want to delete this task?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn-icon delete" title="Delete">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <i class="fas fa-tasks"></i>
+        <h3>No tasks found</h3>
+        <p>Start by adding a new task above</p>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function updateFilters() {
+        const category = document.getElementById('category-filter').value;
+        const priority = document.getElementById('priority-filter').value;
+        
+        let url = new URL(window.location.href);
+        let params = new URLSearchParams();
+        
+        if (category !== 'all') params.append('category', category);
+        if (priority !== 'all') params.append('priority', priority);
+        
+        window.location.href = url.pathname + (params.toString() ? '?' + params.toString() : '');
+    }
+    
+    // Task completion toggle
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const taskId = this.getAttribute('data-task-id');
+                const completed = this.checked;
+                const taskTitle = document.querySelector(`#task-${taskId} .task-title`);
+                
+                fetch(`/toggle/${taskId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ completed: completed })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        if (data.completed) {
+                            taskTitle.classList.add('completed');
+                        } else {
+                            taskTitle.classList.remove('completed');
+                        }
+                    } else {
+                        this.checked = !completed;
+                        if (data.error) {
+                            console.error('Error:', data.error);
+                            alert('Failed to update task: ' + data.error);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    this.checked = !completed;
+                    alert('Failed to update task. Please try again.');
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}

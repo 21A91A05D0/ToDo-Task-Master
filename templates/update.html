@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Update Task{% endblock %}
+
+{% block content %}
+<div class="task-form">
+    <h2 class="mb-4">Update Task</h2>
+    <form action="{{ url_for('update', id=task.id) }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="content">Task</label>
+                <input type="text" class="form-control" id="content" name="content" 
+                       value="{{ task.content }}" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="category">Category</label>
+                <input type="text" class="form-control" id="category" name="category" 
+                       list="categories" value="{{ task.category }}" placeholder="e.g., Work, Personal">
+                <datalist id="categories">
+                    {% for category in categories %}
+                        <option value="{{ category }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            
+            <div class="form-group">
+                <label for="due_date">Due Date</label>
+                <input type="date" class="form-control" id="due_date" name="due_date" 
+                       value="{{ task.due_date.strftime('%Y-%m-%d') if task.due_date else '' }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="priority">Priority</label>
+                <select class="form-control" id="priority" name="priority">
+                    <option value="low" {% if task.priority == 'low' %}selected{% endif %}>Low</option>
+                    <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>Medium</option>
+                    <option value="high" {% if task.priority == 'high' %}selected{% endif %}>High</option>
+                </select>
+            </div>
+            
+            <div class="form-actions">
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-2"></i> Update Task
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
